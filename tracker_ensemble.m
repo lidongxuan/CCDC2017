@@ -20,18 +20,25 @@ function [positions, time] = tracker_ensemble(video_path, img_files, pos, target
 % ================================================================================
 % 环境设置
 % ================================================================================
-indLayers = 1; 
-nweights=1;
-% indLayers = [1,2]; 
-% nweights=[1,0.5];
-% indLayers = [37, 28, 19];   % 选择VGG Net的 Conv5-4, Conv4-4, and Conv3-4 
-% nweights  = [1, 0.5, 0.02]; % 连接CF响应的权值 Weights for combining correlation filter responses
+% indLayers = 1; 
+% nweights=1;
+indLayers = [1,2]; 
+nweights=[1,0.2];
 numLayers = length(indLayers);
 
+if min(target_sz)>32
+    bili=32/min(target_sz);
+else
+    bili=1;
+end
+
 % 获取图片尺寸
-im_sz     = size(imread([video_path img_files{1}]));
+%im_sz     = size(imread([video_path img_files{1}]))
+im_sz = floor(size(imread([video_path img_files{1}]))*bili);
+target_sz=floor(target_sz*bili);
 % 确定搜索域尺寸。针对目标相对整个背景的大小选择合理的搜索域尺寸。padding结构体里提供了三个针对不同情况的比例系数
 window_sz = get_search_window(target_sz, im_sz, padding);
+
 % 计算高斯标记函数的sigma，是目标尺寸宽高乘积的平方根，乘以output_sigma_factor（0.1），再除以cell_size（4）
 output_sigma = sqrt(prod(target_sz)) * output_sigma_factor / cell_size;
 %create regression labels, gaussian shaped, with a bandwidth
@@ -58,6 +65,8 @@ model_xf     = cell(1, numLayers);
 model_alphaf = cell(1, numLayers);
 
 im = imread([video_path img_files{1}]);
+im = imResample(im,im_sz(1:2));
+pos=floor(pos*bili);
 
 % 提取不同层次的卷积特征
 % 在图中抠出搜索窗大小（window_sz）的区域（如果越界，超过的值全部设为边界值），命名为patch，作为提取特征的输入
@@ -76,9 +85,8 @@ kernel_org=kernel;
 % ================================================================================
 for frame = 1:numel(img_files),
     im = imread([video_path img_files{frame}]); % 载入图片
-    if ismatrix(im)
-        im = cat(3, im, im, im);
-    end  
+    im=imResample(im,im_sz(1:2));
+    
     tic();
     
     % ================================================================================
@@ -89,19 +97,16 @@ for frame = 1:numel(img_files),
         % 在图中抠出搜索窗大小（window_sz）的区域（如果越界，超过的值全部设为边界值），命名为patch，作为提取特征的输入
         patch = get_subwindow(im, pos, window_sz);
         
-        [kernel_] = get_kernel(patchsize,patch,target_sz,Fisize);
-        kernel_=  bsxfun(@minus,kernel_,mean(kernel_));
-        %kernel=0.9*kernel_org+0.1*kernel_;
-        kernel=0.9*kernel+0.1*kernel_;
-        
+%        [kernel_] = get_kernel(patchsize,patch,target_sz,Fisize);
+%        kernel_=  bsxfun(@minus,kernel_,mean(kernel_));
+%        %kernel=0.9*kernel+0.1*kernel_;
+%        kernel=0.9*kernel_org+0.1*kernel_;
+     
         % 提取层级卷积特征
-        % feat  = get_features(patch, cos_window, indLayers);
         feat  = get_features_my(patch, cos_window, kernel,patchsize,indLayers);
         % 计算目标位置
         pos  = predictPosition(feat, pos, indLayers, nweights, cell_size, l1_patch_num, ...
             model_xf, model_alphaf);
-        target_sz=predictSize(target_sz,pos,im);
-        % angle = predictAngle(feat_last, pos,temp_pos);
     end
     
     % ================================================================================
@@ -117,15 +122,16 @@ for frame = 1:numel(img_files),
     % ================================================================================
     % Save predicted position and timing
     % ================================================================================
-    positions(frame,:) = pos;
+    positions(frame,:) = pos/bili;
+    %disp(1/toc());
     time = time + toc();
     % Visualization
     if show_visualization,
         box = [pos([2,1]) - target_sz([2,1])/2, target_sz([2,1])];
-        disp(box);
-        stop = update_visualization(frame, box);
+        %disp(box);
+        stop = update_visualization(frame, box/bili);
         if stop, break, end  %user pressed Esc, stop early
-        drawnow
+        drawnow;
         % pause(0.05)  % uncomment to run slower
     end
 end
