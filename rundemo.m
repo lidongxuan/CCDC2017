@@ -3,8 +3,8 @@ addpath('utility');
 
 
 % run_tracker('Sylvester', 1, 1); %0.83
-% run_tracker('BlurCar2', 1, 1);%0.85
- run_tracker('CarDark', 1, 1);%1
+ run_tracker('BlurCar2', 1, 1);%0.85
+% run_tracker('CarDark', 1, 1);%1
 % run_tracker('Crowds', 1, 1);%0.922
 % run_tracker('Dudek', 1, 1); %0.662
 % run_tracker('Football', 1, 1);%0.691
